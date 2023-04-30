@@ -2,23 +2,33 @@ package com.um.feri.cs.pora.mapkotlinexample
 
 import android.Manifest
 import android.annotation.SuppressLint
+import android.app.Activity
 import android.content.*
 import android.graphics.Color
 import android.location.Location
 import android.location.LocationManager
+import android.net.Uri
 import android.os.Bundle
 import android.os.Looper
 import android.view.View
+import androidx.activity.result.ActivityResult
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
+import co.beeline.gpx.Gpx
+import co.beeline.gpx.Route
+import co.beeline.gpx.RoutePoint
 import com.google.android.gms.common.api.ResolvableApiException
 import com.google.android.gms.location.*
 import com.google.android.gms.tasks.Task
 import com.um.feri.cs.pora.mapkotlinexample.databinding.ActivityMainBinding
 import com.um.feri.cs.pora.mapkotlinexample.location.LocationProviderChangedReceiver
 import com.um.feri.cs.pora.mapkotlinexample.location.MyEventLocationSettingsChange
+import io.reactivex.Observable
+import io.reactivex.Single
+import io.ticofab.androidgpxparser.parser.GPXParser
 import org.greenrobot.eventbus.EventBus
 import org.greenrobot.eventbus.Subscribe
 import org.greenrobot.eventbus.ThreadMode
@@ -28,17 +38,16 @@ import org.osmdroid.tileprovider.tilesource.TileSourceFactory
 import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.Marker
-import org.osmdroid.views.overlay.Polygon
 import org.osmdroid.views.overlay.Polyline
-import org.osmdroid.views.overlay.compass.CompassOverlay
-import org.osmdroid.views.overlay.compass.InternalCompassOrientationProvider
 import timber.log.Timber
+import java.io.*
 import java.util.*
+
 
 class MainActivity : AppCompatActivity() {
     private var activityResultLauncher: ActivityResultLauncher<Array<String>>
     private lateinit var fusedLocationClient: FusedLocationProviderClient //https://developer.android.com/training/location/retrieve-current
-    private var lastLoction: Location? = null
+    private var lastLocation: Location? = null
     private var locationCallback: LocationCallback
     private var locationRequest: LocationRequest
     private var requestingLocationUpdates = false
@@ -61,7 +70,7 @@ class MainActivity : AppCompatActivity() {
                 locationResult ?: return
                 for (location in locationResult.locations) {
                     // Update UI with location data
-                    updateLocation(location) //MY function
+                    updateLocation(location)
                 }
             }
         }
@@ -152,7 +161,7 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    fun initLoaction() { //call in create
+    fun initLocation() { //call in create
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
         readLastKnownLocation()
     }
@@ -225,7 +234,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     fun updateLocation(newLocation: Location) {
-        lastLoction = newLocation
+        lastLocation = newLocation
         //GUI, MAP TODO
         binding.tvLat.setText(newLocation.latitude.toString())
         binding.tvLon.setText(newLocation.longitude.toString())
@@ -238,9 +247,8 @@ class MainActivity : AppCompatActivity() {
 
     }
 
-
     fun initMap() {
-        initLoaction()
+        initLocation()
         if (!requestingLocationUpdates) {
             requestingLocationUpdates = true
             startLocationUpdates()
@@ -250,8 +258,7 @@ class MainActivity : AppCompatActivity() {
         map.invalidate()
     }
 
-
-    private fun getPath(): Polyline { //Singelton
+    private fun getPath(): Polyline {
         if (path1 == null) {
             path1 = Polyline()
             path1!!.outlinePaint.color = Color.RED
@@ -262,7 +269,7 @@ class MainActivity : AppCompatActivity() {
         return path1!!
     }
 
-    private fun getPositionMarker(): Marker { //Singelton
+    private fun getPositionMarker(): Marker {
         if (marker == null) {
             marker = Marker(map)
             marker!!.title = "Here I am"
@@ -273,40 +280,116 @@ class MainActivity : AppCompatActivity() {
         return marker!!
     }
 
+    fun clearMap(view: View?) {
+        marker = null
+        path1 = null
 
-    fun onClickDraw1(view: View?) {
-        startPoint.latitude = startPoint.latitude + (rnd.nextDouble() - 0.5) * 0.001
-        mapController.setCenter(startPoint)
-        getPositionMarker().position = startPoint
-        map.invalidate()
+        map.overlayManager.clear()
+
+        updateLocation(lastLocation!!)
     }
 
-    fun onClickDraw2(view: View?) {
-        startPoint.latitude = startPoint.latitude + (rnd.nextDouble() - 0.5) * 0.001
-        mapController.setCenter(startPoint)
-        val circle = Polygon(map)
-        circle.points = Polygon.pointsAsCircle(startPoint, 40.0 + rnd.nextInt(100))
-        circle.fillPaint.color = 0x32323232 //transparent
-        circle.outlinePaint.color = Color.GREEN
-        circle.outlinePaint.strokeWidth = 2f
-        circle.title = "Area X"
-        map.overlays.add(circle) //Duplicate every time new
-        map.invalidate()
-    }
-
-    fun onClickDraw3(view: View?) {
-        val mCompassOverlay = CompassOverlay(this, InternalCompassOrientationProvider(this), map)
-        mCompassOverlay.enableCompass()
-        map.overlays.add(mCompassOverlay)
-        map.invalidate()
-    }
-
-    fun onClickDraw4(view: View?) {
+    fun addRandomPointToPath(view: View?) {
         //Polyline path = new Polyline();
         startPoint.latitude = startPoint.latitude + (rnd.nextDouble() - 0.5) * 0.001
         startPoint.longitude = startPoint.longitude + (rnd.nextDouble() - 0.5) * 0.001
         getPath().addPoint(startPoint.clone())
         map.invalidate()
     }
-}
 
+    fun savePathToGPX(view: View?) {
+        val intent = Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
+            addCategory(Intent.CATEGORY_OPENABLE)
+            type = "application/gpx+xml"
+            putExtra(Intent.EXTRA_TITLE, "${Date().time}.gpx")
+        }
+
+        gpxSaveDirectoryPicker.launch(intent)
+    }
+
+    private val gpxSaveDirectoryPicker = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result: ActivityResult ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            result.data?.data?.let { uri ->
+                val gpx = Gpx(
+                    creator = "Roman Drahan",
+//            metadata = Metadata(name = "Example"),
+                    routes = Observable.fromArray(Route(
+                        points = Observable.fromIterable(
+                            getPath().actualPoints.map { RoutePoint(it.latitude, it.longitude, ele = it.altitude) }
+                        )
+                    ))
+                )
+
+                val tempFile = File("${applicationContext.cacheDir}/ukropsoft.gpx")
+
+                val writer: Single<Writer> = gpx.writeTo(FileWriter(tempFile, false))
+
+                writer.subscribe { _ ->
+                    val inputStream = contentResolver.openInputStream(Uri.fromFile(tempFile))!!
+                    val outputStream = contentResolver.openOutputStream(uri)!!
+
+                    inputStream.copyTo(outputStream)
+
+                    inputStream.close()
+                    outputStream.flush()
+                    tempFile.delete()
+
+                    val dialogBuilder = AlertDialog.Builder(this)
+                    dialogBuilder.setMessage("Saved")
+                    dialogBuilder.show();
+                }
+            }
+        }
+    }
+
+    fun loadPathFromGPX(view: View?) {
+        val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+            addCategory(Intent.CATEGORY_OPENABLE)
+            type = "*/*"
+            putExtra(
+                Intent.EXTRA_MIME_TYPES, arrayOf(
+                    "application/gpx+xml",
+                    "application/octet-stream"
+                )
+            )
+        }
+
+        gpxLoadFilePicker.launch(intent)
+    }
+
+    private val gpxLoadFilePicker = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result: ActivityResult ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            result.data?.data?.let { uri ->
+                contentResolver.openInputStream(uri).let { inputStream ->
+                    val parsedRoutes = GPXParser().parse(inputStream).routes
+
+                    if (parsedRoutes.isNotEmpty()) {
+                        clearMap(null)
+
+                        parsedRoutes.forEach { route ->
+                            route.routePoints.forEach { routePoint ->
+                                getPath().addPoint(
+                                    GeoPoint(
+                                        routePoint.latitude,
+                                        routePoint.longitude,
+                                        routePoint.elevation
+                                    )
+                                )
+                            }
+                        }
+
+                        map.invalidate()
+
+                        val dialogBuilder = AlertDialog.Builder(this)
+                        dialogBuilder.setMessage("Loaded")
+                        dialogBuilder.show();
+                    } else {
+                        val dialogBuilder = AlertDialog.Builder(this)
+                        dialogBuilder.setMessage("There's no routes in file")
+                        dialogBuilder.show();
+                    }
+                }
+            }
+        }
+    }
+}
