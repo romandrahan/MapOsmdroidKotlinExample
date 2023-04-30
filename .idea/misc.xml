@@ -5,10 +5,11 @@
       <map>
         <entry key="..\:/UPORA/MapKotlinExample/app/src/main/res/drawable/ic_position.xml" value="0.3828125" />
         <entry key="..\:/UPORA/MapKotlinExample/app/src/main/res/layout/activity_main.xml" value="0.26132246376811596" />
+        <entry key="app/src/main/res/layout/activity_main.xml" value="0.25864790764407836" />
       </map>
     </option>
   </component>
-  <component name="ProjectRootManager" version="2" languageLevel="JDK_12" project-jdk-name="1.8" project-jdk-type="JavaSDK">
+  <component name="ProjectRootManager" version="2" languageLevel="JDK_11" default="true" project-jdk-name="Embedded JDK" project-jdk-type="JavaSDK">
     <output url="file://$PROJECT_DIR$/build/classes" />
   </component>
   <component name="ProjectType">

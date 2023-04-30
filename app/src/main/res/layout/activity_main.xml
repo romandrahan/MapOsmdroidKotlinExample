@@ -68,33 +68,35 @@
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:textSize="12sp"
-                android:onClick="onClickDraw1"
-                android:text="Marker" />
+                android:onClick="loadPathFromGPX"
+                android:text="Load GPX"
+                android:textSize="12sp" />
+
+            <Button
+                android:id="@+id/button2"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:onClick="addRandomPointToPath"
+                android:text="Add Path"
+                android:textSize="12sp" />
 
             <Button
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:textSize="12sp"
-                android:onClick="onClickDraw2"
-                android:text="Area" />
+                android:onClick="savePathToGPX"
+                android:text="Save GPX"
+                android:textSize="12sp" />
 
             <Button
+                android:id="@+id/button3"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:textSize="12sp"
-                android:onClick="onClickDraw3"
-                android:text="Com." />
-
-            <Button
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:textSize="12sp"
-                android:onClick="onClickDraw4"
-                android:text="Path" />
+                android:onClick="clearMap"
+                android:text="Clear"
+                android:textSize="12sp" />
 
         </LinearLayout>
 
